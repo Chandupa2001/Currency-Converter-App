@@ -1,118 +1,222 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
- */
+import { View, Text, StyleSheet, StatusBar, TextInput, TouchableOpacity } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { Dropdown } from 'react-native-element-dropdown';
+import axios from 'axios';
+import { Button } from 'react-native-paper';
+import {API_KEY, Base_URL} from '@env';
 
-import React from 'react';
-import type {PropsWithChildren} from 'react';
-import {
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  useColorScheme,
-  View,
-} from 'react-native';
+const App = () => {
+  const [date, setDate] = useState(new Date());
+  const [show, setShow] = useState(false);
+  const [sourceCurrency, setSourceCurrency] = useState("");
+  const [targetCurrency, setTargetCurrency] = useState("");
+  const [amountInSourceCurrency, setAmountInSourceCurrency] = useState(0);
+  const [amountInTargetCurrency, setAmountInTargetCurrency] = useState(0);
+  const [currencyNames, setCurrencyNames] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-import {
-  Colors,
-  DebugInstructions,
-  Header,
-  LearnMoreLinks,
-  ReloadInstructions,
-} from 'react-native/Libraries/NewAppScreen';
+  const dropdownCatItems = Object.keys(currencyNames).map((currency: any) => (
+    { label: currencyNames[currency], value: currency }
+  ));
 
-type SectionProps = PropsWithChildren<{
-  title: string;
-}>;
+  useEffect(() => {
+    const getCurrencyNames = async () => {
+      try {
+        const response = await axios.get(
+          `${Base_URL}/currencies.json?app_id=${API_KEY}`
+        );
+        setCurrencyNames(response.data);
+      } catch (error) {
+        console.log(error);
+      }
+    };
+    getCurrencyNames();
+  }, []);
 
-function Section({children, title}: SectionProps): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
-  return (
-    <View style={styles.sectionContainer}>
-      <Text
-        style={[
-          styles.sectionTitle,
-          {
-            color: isDarkMode ? Colors.white : Colors.black,
-          },
-        ]}>
-        {title}
-      </Text>
-      <Text
-        style={[
-          styles.sectionDescription,
-          {
-            color: isDarkMode ? Colors.light : Colors.dark,
-          },
-        ]}>
-        {children}
-      </Text>
-    </View>
-  );
-}
+  const handleSubmit = async () => {
+    const formattedDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+    try {
+      const response = await axios.get(`${Base_URL}/historical/${formattedDate}.json?app_id=${API_KEY}`);
+      
+      const rates = response.data.rates;
 
-function App(): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
+        //rates
+        const sourceRate = rates[sourceCurrency];
+        const targetRate = rates[targetCurrency];
 
-  const backgroundStyle = {
-    backgroundColor: isDarkMode ? Colors.darker : Colors.lighter,
+        //target value
+        const targetAmuont = (targetRate / sourceRate) * amountInSourceCurrency;
+        const amount = targetAmuont.toFixed(2);
+
+        setAmountInTargetCurrency(Number(amount));
+      setLoading(false);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const onChange = (event: any, selectedDate: any) => {
+    const currentDate = selectedDate || date;
+    setDate(currentDate);
+    setShow(false);
+  };
+
+  const showDatePicker = () => {
+    setShow(true);
   };
 
   return (
-    <SafeAreaView style={backgroundStyle}>
-      <StatusBar
-        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor={backgroundStyle.backgroundColor}
-      />
-      <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        style={backgroundStyle}>
-        <Header />
-        <View
-          style={{
-            backgroundColor: isDarkMode ? Colors.black : Colors.white,
-          }}>
-          <Section title="Step One">
-            Edit <Text style={styles.highlight}>App.tsx</Text> to change this
-            screen and then come back to see your edits.
-          </Section>
-          <Section title="See Your Changes">
-            <ReloadInstructions />
-          </Section>
-          <Section title="Debug">
-            <DebugInstructions />
-          </Section>
-          <Section title="Learn More">
-            Read the docs to discover what to do next:
-          </Section>
-          <LearnMoreLinks />
+    <View style={styles.main}>
+      <StatusBar backgroundColor={'#121212'} />
+      <Text style={styles.heading}>Convert Your Currency</Text>
+      <View style={styles.inputSection}>
+        <View style={styles.inputfield}>
+          <Text style={styles.inputLabel}>Date</Text>
+          <View>
+            <TouchableOpacity activeOpacity={0.7} onPress={showDatePicker}>
+              <Text style={styles.inputText}>{date.toLocaleDateString()}</Text>
+            </TouchableOpacity>
+            {show && (
+              <DateTimePicker
+                testID="dateTimePicker"
+                value={date}
+                mode="date"
+                display="default"
+                is24Hour={true}
+                onChange={onChange}
+              />
+            )}
+          </View>
         </View>
-      </ScrollView>
-    </SafeAreaView>
+        <View style={styles.inputfield}>
+          <Text style={styles.inputLabel}>Source Currency</Text>
+          <Dropdown
+            data={dropdownCatItems}
+            value={sourceCurrency}
+            onChange={(item) => setSourceCurrency(item.value)}
+            search = {true}
+            inputSearchStyle={{color: 'white'}}
+            searchPlaceholder='Search currency'
+            placeholder="Select source currency"
+            labelField={'label'}
+            valueField={'value'}
+            placeholderStyle={{ color: '#9ca3af' }}
+            style={styles.inputText}
+            selectedTextStyle={{ color: 'white' }}
+            itemTextStyle={{ color: 'white' }}
+            containerStyle={{ backgroundColor: '#374151' }}
+          />
+        </View>
+        <View style={styles.inputfield}>
+          <Text style={styles.inputLabel}>Target Currency</Text>
+          <Dropdown
+            data={dropdownCatItems}
+            value={targetCurrency}
+            onChange={(item) => setTargetCurrency(item.value)}
+            search = {true}
+            inputSearchStyle={{color: 'white'}}
+            searchPlaceholder='Search currency'
+            placeholder="Select target currency"
+            labelField={'label'}
+            valueField={'value'}
+            placeholderStyle={{ color: '#9ca3af' }}
+            style={styles.inputText}
+            selectedTextStyle={{ color: 'white' }}
+            itemTextStyle={{ color: 'white' }}
+            containerStyle={{ backgroundColor: '#374151' }}
+          />
+        </View>
+        <View style={styles.inputfield}>
+          <Text style={styles.inputLabel}>Amount in Source Currency</Text>
+          <TextInput
+            keyboardType='numeric'
+            onChangeText={(text) => setAmountInSourceCurrency(Number(text))}
+            style={styles.inputText}
+            placeholder='Amount in source currency'
+            placeholderTextColor={'#9ca3af'}
+          />
+        </View>
+        <View>
+          <Button mode='contained' style={styles.button} onPress={handleSubmit}>
+            <Text style={styles.buttonText}>Get the target currency</Text>
+          </Button>
+        </View>
+        {!loading && (
+          <View>
+            <Text style={styles.resultText}>
+              {amountInSourceCurrency} {sourceCurrency} = <Text style={{ color: 'red', fontSize: 25, fontWeight: '800' }}> {amountInTargetCurrency} </Text> {targetCurrency}
+            </Text>
+          </View>
+        )}
+      </View>
+    </View>
   );
-}
-
-const styles = StyleSheet.create({
-  sectionContainer: {
-    marginTop: 32,
-    paddingHorizontal: 24,
-  },
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-  },
-  sectionDescription: {
-    marginTop: 8,
-    fontSize: 18,
-    fontWeight: '400',
-  },
-  highlight: {
-    fontWeight: '700',
-  },
-});
+};
 
 export default App;
+
+const styles = StyleSheet.create({
+  main: {
+    flex: 1,
+    backgroundColor: '#121212',
+  },
+
+  heading: {
+    textAlign: 'center',
+    marginTop: '8%',
+    fontSize: 30,
+    fontWeight: '700',
+    color: '#22c55e',
+  },
+
+  inputSection: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: '10%',
+  },
+
+  inputfield: {
+    marginBottom: '5%',
+    width: '90%',
+  },
+
+  inputLabel: {
+    color: 'white',
+    fontWeight: 'medium',
+    marginBottom: '2%',
+    fontSize: 16,
+  },
+
+  inputText: {
+    width: 'auto',
+    borderColor: '#4b5563',
+    borderWidth: 1,
+    borderRadius: 10,
+    backgroundColor: '#374151',
+    color: 'white',
+    fontSize: 18,
+    padding: 10,
+  },
+
+  button: {
+    marginTop: '3%',
+    backgroundColor: '#22c55e',
+    borderRadius: 10,
+    paddingHorizontal: '4%',
+    paddingVertical: '2%',
+  },
+
+  buttonText: {
+    fontSize: 18,
+    fontWeight: '500',
+  },
+
+  resultText: {
+    color: 'white',
+    fontSize: 18,
+    marginTop: '10%',
+  },
+});
